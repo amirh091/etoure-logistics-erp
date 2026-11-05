@@ -1,0 +1,25 @@
+{
+  "name": "E-TOURÉ LOGISTICS ERP",
+  "short_name": "E-TOURÉ ERP",
+  "description": "Gestion complète d'entreprise de transport, livraison et déménagement : livraisons, chauffeurs, véhicules, finance, géolocalisation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0B1B33",
+  "theme_color": "#0B1B33",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "logistics"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tableau de bord", "short_name": "Dashboard", "url": "/dashboard" },
+    { "name": "Livraisons", "short_name": "Livraisons", "url": "/livraisons" },
+    { "name": "Carte live", "short_name": "Carte", "url": "/carte" }
+  ]
+}
