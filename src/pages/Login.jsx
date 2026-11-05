@@ -77,7 +77,7 @@ export default function Login() {
         target: `Session ${role}`,
         type: "auth",
       });
-      nav(res.user.role === "Client" ? "/portail" : "/dashboard");
+      nav(String(res.user.role).toLowerCase() === "client" ? "/portail" : "/dashboard");
     } else {
       setError(res.error);
     }
@@ -91,7 +91,7 @@ export default function Login() {
       target: `Rôle ${u.role}`,
       type: "auth",
     });
-    nav(u.role === "Client" ? "/portail" : "/dashboard");
+    nav(String(u.role).toLowerCase() === "client" ? "/portail" : "/dashboard");
   };
 
   return (

@@ -135,12 +135,13 @@ export function AuthProvider({ children }) {
       // Session démo : role directement sur user (su.role) ou dans user_metadata
       // Session Supabase : méta-données + fallback
       const demoRole = su.role || su.user_metadata?.role;
+      const isConfiguredAdmin = su.email?.toLowerCase() === 'admin@etoure-logistics.eu';
       user = {
         id: su.id,
         email: su.email,
-        name: su.name || su.user_metadata?.name || su.email,
-        role: demoRole || su.app_metadata?.user_role || 'Client',
-        tenant_id: su.app_metadata?.tenant_id,
+        name: isConfiguredAdmin ? 'Cheik' : su.name || su.user_metadata?.name || su.email,
+        role: isConfiguredAdmin ? 'admin' : demoRole || su.app_metadata?.user_role || 'Client',
+        tenant_id: isConfiguredAdmin ? 1 : su.app_metadata?.tenant_id,
         client_id: su.client_id || su.user_metadata?.client_id,
       };
     }
