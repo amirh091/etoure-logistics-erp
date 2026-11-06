@@ -99,6 +99,8 @@ BEGIN
 END; $$;
 ```
 
+Le profil ERP doit aussi être lié au compte Auth : `users.auth_user_id` doit contenir l’UUID du compte et `users.role_id` doit référencer le rôle `admin`. Si un profil avec cet e-mail existe déjà, exécutez `supabase/link-admin-account.sql` dans le SQL Editor Supabase. Le script s’arrête explicitement si le compte Auth ou le profil ERP est absent, ou si plusieurs profils rendent le tenant ambigu.
+
 ### Étape 5 — Remplacer la couche de données du frontend
 Le code actuel utilise un `reducer` + `localStorage`. La bascule se fait dans **`src/store/StoreContext.jsx`** :
 

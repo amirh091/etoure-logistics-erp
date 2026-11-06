@@ -37,11 +37,12 @@ function Protected({ children }) {
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
+  const isClient = String(user?.role).toLowerCase() === 'client';
 
   return (
     <Suspense fallback={<Loader />}>
       <Routes>
-        <Route path="/login" element={isAuthenticated ? <Navigate to={user?.role === 'Client' ? '/portail' : '/dashboard'} replace /> : <Login />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to={isClient ? '/portail' : '/dashboard'} replace /> : <Login />} />
         <Route
           element={
             <Protected>
@@ -49,7 +50,7 @@ export default function App() {
             </Protected>
           }
         >
-          <Route path="/" element={<Navigate to={user?.role === 'Client' ? '/portail' : '/dashboard'} replace />} />
+          <Route path="/" element={<Navigate to={isClient ? '/portail' : '/dashboard'} replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/livraisons" element={<Deliveries />} />

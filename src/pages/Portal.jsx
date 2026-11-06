@@ -17,7 +17,7 @@ import {
   Euro,
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
-import { useAuth } from "../store/AuthContext";
+import { normalizeRole, useAuth } from "../store/AuthContext";
 import {
   Badge,
   SectionCard,
@@ -40,11 +40,12 @@ export default function Portal() {
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState(null);
+  const role = normalizeRole(user?.role);
 
   /* Livraisons du client connecté (ou toutes en démo admin) */
   const myDeliveries = useMemo(() => {
     let rows = state.deliveries;
-    if (user?.role === "Client" && user?.client_id)
+    if (role === "client" && user?.client_id)
       rows = rows.filter((d) => d.clientId === user.client_id);
     const term = q.trim().toLowerCase();
     if (term)
@@ -54,14 +55,14 @@ export default function Portal() {
           .includes(term),
       );
     return rows;
-  }, [state.deliveries, user, q]);
+  }, [state.deliveries, user, q, role]);
 
   const myInvoices = useMemo(() => {
     let rows = state.invoices;
-    if (user?.role === "Client" && user?.client_id)
+    if (role === "client" && user?.client_id)
       rows = rows.filter((i) => i.clientId === user.client_id);
     return rows;
-  }, [state.invoices, user]);
+  }, [state.invoices, user, role]);
 
   const client = state.clients.find(
     (c) => c.id === (user?.client_id || "CLI-1001"),

@@ -6,6 +6,7 @@ import { supabase, USE_SUPABASE } from '../lib/supabase';
 import { useAuth } from './AuthContext'; // ⬅️ NOUVEAU
 
 const STORAGE_KEY = 'etoure-erp-state-v1';
+const NOTIFICATION_SETTINGS_KEY = 'etoure-erp-notification-settings-v1';
 const COLLECTIONS = ['clients','drivers','vehicles','deliveries','expenses','invoices','quotes','notifications','users','activityLog'];
 
 const DEFAULT_SETTINGS = {
@@ -115,6 +116,28 @@ function useDemoStore() {
 export function StoreProvider({ children }) {
   const impl = USE_SUPABASE ? useSupabaseStore() : useDemoStore();
   const [toasts, setToasts] = useState([]);
+  const [notificationSettings, setNotificationSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+      const parsed = saved ? JSON.parse(saved) : {};
+      return {
+        ...seed.notificationSettings,
+        ...parsed,
+        rules: Array.isArray(parsed.rules) ? parsed.rules : seed.notificationSettings.rules,
+      };
+    } catch (error) {
+      console.error('Impossible de charger les préférences de notification :', error);
+      return seed.notificationSettings;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(notificationSettings));
+    } catch (error) {
+      console.error('Impossible de sauvegarder les préférences de notification :', error);
+    }
+  }, [notificationSettings]);
 
   const toast = (message, kind = 'ok') => {
     const id = Date.now() + Math.random();
@@ -148,15 +171,19 @@ export function StoreProvider({ children }) {
     } catch (e) { console.warn('markAllRead ignoré:', e?.message); }
   };
   const updateNotifSettings = async (patch) => {
-    try { await impl.update('settings', patch); } catch { /* en démo, géré par l'état local */ }
+    setNotificationSettings((current) => ({ ...current, ...patch }));
   };
   const toggleRule = async (ruleId) => {
-    const rules = (impl.state.notificationSettings?.rules || []).map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r));
-    try { await impl.update('settings', { rules }); } catch { /* démo */ }
+    setNotificationSettings((current) => ({
+      ...current,
+      rules: current.rules.map((rule) => (
+        rule.id === ruleId ? { ...rule, enabled: !rule.enabled } : rule
+      )),
+    }));
   };
 
   const api = useMemo(() => ({
-    state: impl.state,
+    state: { ...impl.state, notificationSettings },
     add: impl.add,
     update: impl.update,
     remove: impl.remove,
@@ -181,7 +208,7 @@ export function StoreProvider({ children }) {
       localStorage.removeItem(STORAGE_KEY);
       window.location.reload();
     },
-  }), [impl.state, impl.add, impl.update, impl.remove]);
+  }), [impl.state, impl.add, impl.update, impl.remove, notificationSettings]);
 
   return (
     <StoreCtx.Provider value={api}>

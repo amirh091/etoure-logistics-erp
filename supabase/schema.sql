@@ -46,8 +46,8 @@ CREATE TABLE permissions (
 );
 
 CREATE TABLE role_permissions (
-  role_id       TINYINTEGER  NOT NULL,
-  permission_id SMALLINTEGER NOT NULL,
+  role_id       SMALLINT NOT NULL,
+  permission_id SMALLINT NOT NULL,
   FOREIGN KEY (role_id)       REFERENCES roles(id)       ON DELETE CASCADE,
   PRIMARY KEY (role_id, permission_id),
   FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
@@ -57,7 +57,7 @@ CREATE TABLE users (
   id             BIGSERIAL PRIMARY KEY,
   auth_user_id   UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE, -- lien Supabase Auth
   tenant_id      BIGINT NOT NULL,
-  role_id        TINYINTEGER NOT NULL,
+  role_id        SMALLINT NOT NULL,
   client_id      BIGINT NULL,         -- si rôle "client" : rattachement au portail,
   name           VARCHAR(160) NOT NULL,
   email          VARCHAR(190) NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE vehicles (
   model                   VARCHAR(120) NOT NULL,
   brand                   VARCHAR(80)  NULL,
   type VARCHAR(40) CHECK (type IN ('Camion', 'Fourgonnette', 'Moto')) NOT NULL,
-  year                    SMALLINTEGER NULL,
+  year                    SMALLINT NULL,
   capacity_kg             INTEGER NOT NULL DEFAULT 0,
   fuel VARCHAR(40) CHECK (fuel IN ('Diesel', 'Essence', 'Électrique', 'Hybride', 'GNV')) DEFAULT 'Diesel',
   mileage_km              INTEGER NOT NULL DEFAULT 0,
@@ -211,7 +211,7 @@ CREATE TABLE deliveries (
   vehicle_type VARCHAR(40) CHECK (vehicle_type IN ('Camion', 'Fourgonnette', 'Moto')) NULL,
   status VARCHAR(40) CHECK (status IN ('En attente', 'Confirmée', 'En cours', 'Livrée', 'Annulée')) NOT NULL DEFAULT 'En attente',
   priority VARCHAR(40) CHECK (priority IN ('Normale', 'Haute', 'Urgente')) NOT NULL DEFAULT 'Normale',
-  progress              TINYINTEGER NOT NULL DEFAULT 0,
+  progress              SMALLINT NOT NULL DEFAULT 0,
   price_ht              DECIMAL(10,2) NOT NULL DEFAULT 0,
   cost_ht               DECIMAL(10,2) NOT NULL DEFAULT 0,
   fragile               BOOLEAN NOT NULL DEFAULT FALSE,
@@ -254,8 +254,8 @@ CREATE TABLE vehicle_positions (
   delivery_id BIGINT NULL,
   lat         DECIMAL(9,6) NOT NULL,
   lng         DECIMAL(9,6) NOT NULL,
-  speed_kmh   SMALLINTEGER NULL,
-  heading     SMALLINTEGER NULL,
+  speed_kmh   SMALLINT NULL,
+  heading     SMALLINT NULL,
   recorded_at TIMESTAMPTZ NOT NULL,
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
   FOREIGN KEY (delivery_id) REFERENCES deliveries(id) ON DELETE SET NULL
@@ -296,7 +296,7 @@ CREATE TABLE invoice_items (
   quantity    DECIMAL(10,2) NOT NULL DEFAULT TRUE,
   unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
   total_ht    DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
-  position    TINYINTEGER NOT NULL DEFAULT 0,
+  position    SMALLINT NOT NULL DEFAULT 0,
   FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 
@@ -329,7 +329,7 @@ CREATE TABLE quote_items (
   quantity    DECIMAL(10,2) NOT NULL DEFAULT TRUE,
   unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
   total_ht    DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
-  position    TINYINTEGER NOT NULL DEFAULT 0,
+  position    SMALLINT NOT NULL DEFAULT 0,
   FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE
 );
 

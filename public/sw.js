@@ -1,5 +1,13 @@
-const CACHE = 'etoure-erp-v1';
-const ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'etoure-erp-v3';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/logo.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/web-app-manifest-192x192.png',
+  '/icons/web-app-manifest-512x512.png',
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -21,10 +29,12 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put('/index.html', copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put('/index.html', copy));
+        }
         return res;
-      }).catch(() => caches.match('/index.html'))
+      }).catch(async () => (await caches.match('/index.html')) || Response.error())
     );
     return;
   }
@@ -38,7 +48,23 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
-      });
+      }).catch(() => Response.error());
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = new URL(e.notification.data?.url || '/', self.location.origin);
+  if (target.origin !== self.location.origin) return;
+
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (existing) {
+        return existing.navigate(target.href).then((client) => client?.focus());
+      }
+      return self.clients.openWindow(target.href);
     })
   );
 });

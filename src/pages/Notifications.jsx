@@ -57,6 +57,56 @@ export default function Notifications() {
     message: "",
   });
   const [sending, setSending] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(() => (
+    typeof window !== "undefined" && "Notification" in window
+      ? window.Notification.permission
+      : "unsupported"
+  ));
+
+  const enableBrowserNotifications = async () => {
+    if (!("Notification" in window)) {
+      toast("Les notifications système ne sont pas prises en charge par ce navigateur.", "err");
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      toast("Les notifications sont bloquées dans le navigateur. Autorisez-les dans les paramètres du site.", "err");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        updateNotifSettings({ push: true });
+        toast("Les alertes navigateur sont activées.");
+      } else {
+        toast("Autorisation non accordée : les alertes resteront visibles dans l’application.", "err");
+      }
+    } catch (error) {
+      console.error("La demande d’autorisation de notification a échoué :", error);
+      toast("Impossible d’activer les alertes navigateur.", "err");
+    }
+  };
+
+  const showBrowserNotification = async (title, body, target) => {
+    if (notificationPermission !== "granted" || !state.notificationSettings.push) return;
+
+    try {
+      const options = {
+        body,
+        icon: "/icons/web-app-manifest-192x192.png",
+        badge: "/icons/favicon-96x96.png",
+        data: { url: target || "/notifications" },
+      };
+      const registration = await navigator.serviceWorker?.getRegistration();
+      if (registration) await registration.showNotification(title, options);
+      else new Notification(title, options);
+    } catch (error) {
+      console.error("Impossible d’afficher l’alerte système :", error);
+      toast("La notification a été conservée dans le centre, mais l’alerte système a échoué.", "err");
+    }
+  };
 
   const filtered = useMemo(() => {
     let rows = [...state.notifications];
@@ -90,6 +140,11 @@ export default function Notifications() {
           target: "/notifications",
         },
       });
+      showBrowserNotification(
+        composer.subject || `Message ${CHANNEL_META[composer.channel].label}`,
+        composer.message,
+        "/notifications",
+      );
       log({
         user: user?.name,
         action: `Notification ${CHANNEL_META[composer.channel].label}`,
@@ -130,6 +185,20 @@ export default function Notifications() {
           </p>
         </div>
         <div className="page-head-actions">
+          <button
+            className="btn btn-ghost"
+            onClick={enableBrowserNotifications}
+            aria-label="Activer les notifications système"
+          >
+            <Bell size={15} />
+            {notificationPermission === "granted" && state.notificationSettings.push
+              ? "Alertes navigateur actives"
+              : notificationPermission === "denied"
+                ? "Alertes bloquées"
+                : notificationPermission === "unsupported"
+                  ? "Alertes indisponibles"
+                  : "Activer les alertes"}
+          </button>
           <button
             className="btn btn-ghost"
             onClick={() => {
@@ -236,21 +305,27 @@ export default function Notifications() {
               const TIcon = TM.icon;
               const CIcon = CM.icon;
               return (
-                <div
+                <article
                   key={n.id}
                   className={`notif-row ${n.read ? "" : "unread"}`}
-                  role="button"
                   tabIndex={0}
+                  aria-label={`${TM.label} : ${n.title}${n.read ? "" : ", non lue"}`}
                   onClick={() => !n.read && markRead(n.id)}
                   onKeyDown={(e) => {
-                    if ((e.key === "Enter" || e.key === " ") && !n.read) {
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && !n.read) {
                       e.preventDefault();
                       markRead(n.id);
                     }
                   }}
                 >
-                  <div className={`icon-tile ${TM.tone} notif-ic`}>
-                    <TIcon size={15} />
+                  <div className={`notif-logo ${TM.tone} ${n.read ? "" : "is-unread"}`} aria-hidden="true">
+                    <div className="notif-logo-main">
+                      <TIcon size={18} strokeWidth={2.2} />
+                    </div>
+                    <span className={`notif-logo-channel ${CM.tone}`}>
+                      <CIcon size={10} strokeWidth={2.4} />
+                    </span>
+                    {!n.read && <span className="notif-logo-pulse" />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="row" style={{ gap: 7, flexWrap: "wrap" }}>
@@ -300,6 +375,7 @@ export default function Notifications() {
                           markRead(n.id);
                         }}
                         title="Marquer comme lu"
+                        aria-label={`Marquer « ${n.title} » comme lue`}
                       >
                         <CheckCheck size={14} />
                       </button>
@@ -313,11 +389,12 @@ export default function Notifications() {
                         toast("Notification supprimée");
                       }}
                       title="Supprimer"
+                      aria-label={`Supprimer « ${n.title} »`}
                     >
                       <Trash2 size={13} />
                     </button>
                   </div>
-                </div>
+                </article>
               );
             })}
             {!filtered.length && (
@@ -436,8 +513,14 @@ export default function Notifications() {
                     </div>
                   </div>
                   <Switch
-                    on={state.notificationSettings[k]}
+                    on={k === "push"
+                      ? state.notificationSettings.push && notificationPermission === "granted"
+                      : state.notificationSettings[k]}
                     onChange={(v) => {
+                      if (k === "push" && v) {
+                        enableBrowserNotifications();
+                        return;
+                      }
                       updateNotifSettings({ [k]: v });
                       toast(`${label} ${v ? "activé" : "désactivé"}`);
                     }}

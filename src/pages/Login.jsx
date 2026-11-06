@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Truck,
   Mail,
   Lock,
   Eye,
@@ -17,13 +16,14 @@ import {
 } from "lucide-react";
 import { useAuth } from "../store/AuthContext";
 import { useStore } from "../store/StoreContext";
+import { USE_SUPABASE } from "../lib/supabase";
 
 const ROLES = [
   {
     key: "Administrateur",
     label: "Administrateur",
     desc: "Accès complet",
-    email: "admin@etoure-logistics.eu",
+    email: USE_SUPABASE ? "cheikdev7@gmail.com" : "admin@etoure-logistics.eu",
   },
   {
     key: "Manager",
@@ -50,8 +50,8 @@ export default function Login() {
   const { log } = useStore();
   const nav = useNavigate();
   const [role, setRole] = useState("Administrateur");
-  const [email, setEmail] = useState("admin@etoure-logistics.eu");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState(ROLES[0].email);
+  const [password, setPassword] = useState(USE_SUPABASE ? "" : "demo1234");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,7 +60,7 @@ export default function Login() {
   const pickRole = (r) => {
     setRole(r.key);
     setEmail(r.email);
-    setPassword("demo1234");
+    setPassword(USE_SUPABASE ? "" : "demo1234");
     setError("");
   };
 
@@ -68,9 +68,13 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await login({ email, password, role });
-    setBusy(false);
-    if (res.ok) {
+    try {
+      const res = await login({ email, password, role });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+
       log({
         user: res.user.name,
         action: "Connexion réussie",
@@ -78,39 +82,37 @@ export default function Login() {
         type: "auth",
       });
       nav(String(res.user.role).toLowerCase() === "client" ? "/portail" : "/dashboard");
-    } else {
-      setError(res.error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "La connexion a échoué.");
+    } finally {
+      setBusy(false);
     }
   };
 
   const quickDemo = () => {
-    const u = loginAs(role);
-    log({
-      user: u.name,
-      action: "Connexion démo",
-      target: `Rôle ${u.role}`,
-      type: "auth",
-    });
-    nav(String(u.role).toLowerCase() === "client" ? "/portail" : "/dashboard");
+    try {
+      const u = loginAs(role);
+      log({
+        user: u.name,
+        action: "Connexion démo",
+        target: `Rôle ${u.role}`,
+        type: "auth",
+      });
+      nav(String(u.role).toLowerCase() === "client" ? "/portail" : "/dashboard");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "L’accès démo a échoué.");
+    }
   };
 
   return (
     <div className="auth-wrap">
       <aside className="auth-aside">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="row" style={{ gap: 12 }}>
-<div className="brand" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'center' }}>
-  <img 
-    src="/logo.png" 
-    alt="E-TOURÉ ERP" 
-    style={{ width: '100%', height: 'auto', maxHeight: 90, objectFit: 'contain' }} 
-  />
-</div>
-            <div>
-              <div className="brand-title" style={{ fontSize: "1.05rem" }}>
-                E-TOURÉ LOGISTICS
-              </div>
-              <div className="brand-sub">Enterprise Resource Planning</div>
+          <div className="auth-brand-lockup">
+            <img src="/icons/web-app-manifest-192x192.png" alt="E-TOURÉ ERP" className="auth-brand-logo" />
+            <div className="auth-brand-copy">
+              <div className="brand-title">E-TOURÉ LOGISTICS</div>
+              <div className="brand-sub">Transport · Livraison · Logistique</div>
             </div>
           </div>
 
@@ -201,37 +203,11 @@ export default function Login() {
 
       <main className="auth-panel">
         <div className="auth-card">
-          <div className="row" style={{ gap: 10, marginBottom: 22 }}>
-            <div
-              className="brand-mark"
-              style={{
-                width: 36,
-                height: 36,
-                flex: "0 0 36px",
-                borderRadius: 11,
-              }}
-            >
-              <Truck size={18} />
-            </div>
+          <div className="auth-panel-brand">
+            <img src="/icons/web-app-manifest-192x192.png" alt="" className="auth-panel-logo" />
             <div>
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: ".86rem",
-                  letterSpacing: ".04em",
-                }}
-              >
-                E-TOURÉ ERP
-              </div>
-              <div
-                style={{
-                  fontSize: ".62rem",
-                  color: "var(--text-3)",
-                  letterSpacing: ".16em",
-                }}
-              >
-                ESPACE SÉCURISÉ
-              </div>
+              <div className="auth-panel-brand-title">E-TOURÉ ERP</div>
+              <div className="auth-panel-brand-sub">ESPACE SÉCURISÉ</div>
             </div>
           </div>
 
@@ -245,22 +221,24 @@ export default function Login() {
 </p>
 
           <form onSubmit={submit} style={{ marginTop: 24 }}>
-            <div className="field mb-2">
-              <label>Type de compte</label>
-              <div className="role-pick">
-                {ROLES.map((r) => (
-                  <button
-                    type="button"
-                    key={r.key}
-                    className={`role-btn ${role === r.key ? "on" : ""}`}
-                    onClick={() => pickRole(r)}
-                  >
-                    <b>{r.label}</b>
-                    <span>{r.desc}</span>
-                  </button>
-                ))}
+            {!USE_SUPABASE && (
+              <div className="field mb-2">
+                <label>Type de compte</label>
+                <div className="role-pick">
+                  {ROLES.map((r) => (
+                    <button
+                      type="button"
+                      key={r.key}
+                      className={`role-btn ${role === r.key ? "on" : ""}`}
+                      onClick={() => pickRole(r)}
+                    >
+                      <b>{r.label}</b>
+                      <span>{r.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="field mb-2">
               <label htmlFor="email">Adresse e-mail</label>
@@ -382,43 +360,47 @@ export default function Login() {
               )}
             </button>
 
-            <button
-              className="btn btn-ghost btn-block mt-1"
-              type="button"
-              onClick={quickDemo}
-            >
-              <Zap size={15} /> Accès démo instantané ({role})
-            </button>
-
-            <div className="demo-hint">
-              <div className="row" style={{ gap: 6, marginBottom: 5 }}>
-                <ShieldCheck size={13} style={{ color: "var(--green-500)" }} />
-                <strong style={{ fontSize: ".76rem" }}>
-                  Authentification JWT active
-                </strong>
-              </div>
-              Mot de passe démo :{" "}
-              <code style={{ fontWeight: 700 }}>demo1234</code> — n'importe quel
-              e-mail de la liste fonctionne.
-              <div
-                style={{
-                  marginTop: 6,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 4,
-                }}
+            {!USE_SUPABASE && (
+              <button
+                className="btn btn-ghost btn-block mt-1"
+                type="button"
+                onClick={quickDemo}
               >
-                {ROLES.map((r) => (
-                  <span
-                    key={r.key}
-                    className="badge navy"
-                    style={{ fontSize: ".64rem" }}
-                  >
-                    <Check size={9} /> {r.label}
-                  </span>
-                ))}
+                <Zap size={15} /> Accès démo instantané ({role})
+              </button>
+            )}
+
+            {!USE_SUPABASE && (
+              <div className="demo-hint">
+                <div className="row" style={{ gap: 6, marginBottom: 5 }}>
+                  <ShieldCheck size={13} style={{ color: "var(--green-500)" }} />
+                  <strong style={{ fontSize: ".76rem" }}>
+                    Mode de démonstration local
+                  </strong>
+                </div>
+                Mot de passe démo :{" "}
+                <code style={{ fontWeight: 700 }}>demo1234</code> — n'importe
+                quel e-mail de la liste fonctionne.
+                <div
+                  style={{
+                    marginTop: 6,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                  }}
+                >
+                  {ROLES.map((r) => (
+                    <span
+                      key={r.key}
+                      className="badge navy"
+                      style={{ fontSize: ".64rem" }}
+                    >
+                      <Check size={9} /> {r.label}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </form>
 
           <p
@@ -448,7 +430,9 @@ export default function Login() {
               size={11}
               style={{ display: "inline", verticalAlign: -1 }}
             />{" "}
-            Connexion chiffrée · Session 12 h · 2FA disponible
+            {USE_SUPABASE
+              ? "Connexion sécurisée via Supabase"
+              : "Mode démo · données enregistrées dans ce navigateur"}
           </p>
         </div>
       </main>

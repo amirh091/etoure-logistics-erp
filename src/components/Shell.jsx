@@ -3,12 +3,12 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Truck, IdCard, Car, Wallet, Map, Bell, ShieldCheck, Menu, Search,
   Sun, Moon, LogOut, ChevronDown, Package, Download, X, Settings, Building2, Sparkles,
-  LayoutGrid, ArrowRight, Command,
+  LayoutGrid, ArrowRight, Clock3,
 } from 'lucide-react';
 import { useStore } from '../store/StoreContext';
-import { useAuth } from '../store/AuthContext';
+import { normalizeRole, useAuth } from '../store/AuthContext';
 import { Avatar } from './ui';
-import { fmtDateTime, timeAgo } from '../lib/helpers';
+import { timeAgo } from '../lib/helpers';
 
 const NAV = [
   { group: 'Pilotage', items: [
@@ -45,7 +45,7 @@ const TITLES = {
 };
 
 export default function Shell() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, toast } = useStore();
   const { user, logout, can } = useAuth();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('etoure-theme') || 'light');
@@ -54,14 +54,24 @@ export default function Shell() {
   const [showUser, setShowUser] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installDismissed, setInstallDismissed] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => (
+    window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true
+  ));
+  const [now, setNow] = useState(() => new Date());
   const loc = useLocation();
   const nav = useNavigate();
   const searchRef = useRef(null);
+  const isAdmin = normalizeRole(user?.role) === 'admin' || normalizeRole(user?.role) === 'administrateur';
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('etoure-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -72,8 +82,16 @@ export default function Shell() {
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
+    const installed = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', installed);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installed);
+    };
   }, []);
 
   useEffect(() => {
@@ -88,6 +106,15 @@ export default function Shell() {
   }, []);
 
   const unread = state.notifications.filter((n) => !n.read).length;
+  const mobileItems = [
+    { to: '/dashboard', label: 'Accueil', icon: LayoutDashboard, key: 'dashboard' },
+    { to: '/livraisons', label: 'Livraisons', icon: Package, key: 'livraisons' },
+    { to: '/carte', label: 'Carte', icon: Map, key: 'carte' },
+    { to: '/finance', label: 'Finance', icon: Wallet, key: 'finance' },
+    { to: '/notifications', label: 'Alertes', icon: Bell, key: 'notifications' },
+    { to: '/clients', label: 'Clients', icon: Users, key: 'clients' },
+    { to: '/portail', label: 'Portail', icon: Building2, key: 'portail' },
+  ].filter((item) => isAdmin || can(item.key)).slice(0, 5);
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -107,22 +134,37 @@ export default function Shell() {
   }, [q, state]);
 
   const install = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') setDeferredPrompt(null);
+    if (!deferredPrompt) {
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      toast(isIos
+        ? 'Pour installer l’application : touchez Partager, puis « Sur l’écran d’accueil ».'
+        : 'Dans le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».', 'info');
+      return;
+    }
+
+    try {
+      const prompt = deferredPrompt;
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      setDeferredPrompt(null);
+      if (choice.outcome === 'accepted') setIsInstalled(true);
+    } catch (error) {
+      console.error('Échec de la demande d’installation PWA :', error);
+      toast('L’installation n’a pas pu démarrer. Réessayez depuis le menu du navigateur.', 'err');
+      setDeferredPrompt(null);
     }
   };
 
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? 'open' : ''}`}>
-        <div className="brand" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'center' }}>
-          <img 
-            src="/logo.png" 
-            alt="E-TOURÉ ERP" 
-            style={{ width: '100%', height: 'auto', maxHeight: 90, objectFit: 'contain' }} 
-          />
+        <div className="brand brand-lockup">
+          <img src="/icons/web-app-manifest-192x192.png" alt="" className="brand-logo-image" />
+          <span className="brand-copy">
+            <span className="brand-title">E-TOURÉ</span>
+            <span className="brand-sub">LOGISTICS ERP</span>
+          </span>
           <button className="icon-btn sidebar-close" style={{ position: 'absolute', right: 10, top: 10, color: '#7F94B3' }} onClick={() => setOpen(false)} aria-label="Fermer">
             <X size={17} />
           </button>
@@ -130,7 +172,8 @@ export default function Shell() {
 
         <nav className="nav-scroll">
           {NAV.map((g) => {
-            const items = g.items.filter((it) => !user || can(it.key) || user.role === 'Administrateur');
+            const isAdmin = normalizeRole(user?.role) === 'admin' || normalizeRole(user?.role) === 'administrateur';
+            const items = g.items.filter((it) => !user || can(it.key) || isAdmin);
             if (!items.length) return null;
             return (
               <div key={g.group}>
@@ -184,9 +227,27 @@ export default function Shell() {
           </label>
           <div className="topbar-spacer" />
 
+          <div className="topbar-clock" aria-label={`Heure locale : ${now.toLocaleTimeString('fr-FR')}`}>
+            <Clock3 size={16} aria-hidden="true" />
+            <span className="topbar-clock-copy">
+              <time className="topbar-clock-time" dateTime={now.toISOString()}>
+                {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </time>
+              <span className="topbar-clock-date">
+                {now.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+              </span>
+            </span>
+          </div>
+
           <button className="icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Changer de thème" title="Mode sombre / clair">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+
+          {!isInstalled && !deferredPrompt && (
+            <button className="btn btn-soft btn-sm install-action" onClick={install} title="Installer l'application" aria-label="Installer E-TOURÉ ERP">
+              <Download size={14} /> Installer
+            </button>
+          )}
 
           {deferredPrompt && !installDismissed && (
             <button className="btn btn-soft btn-sm" onClick={install} title="Installer l'application">
@@ -283,14 +344,8 @@ export default function Shell() {
         </main>
       </div>
 
-      <nav className="mobile-nav">
-        {[
-          { to: '/dashboard', label: 'Accueil', icon: LayoutDashboard },
-          { to: '/livraisons', label: 'Livraisons', icon: Package },
-          { to: '/carte', label: 'Carte', icon: Map },
-          { to: '/finance', label: 'Finance', icon: Wallet },
-          { to: '/clients', label: 'Clients', icon: Users },
-        ].map((it) => (
+      <nav className="mobile-nav" style={{ '--mobile-nav-count': mobileItems.length }}>
+        {mobileItems.map((it) => (
           <NavLink key={it.to} to={it.to} className={({ isActive }) => (isActive ? 'on' : '')}>
             <it.icon size={19} strokeWidth={2.1} />
             {it.label}
